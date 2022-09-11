@@ -1,3 +1,8 @@
+export interface IRecord {
+  type: string
+  spm: string
+}
+
 // 缓存所有hook，并在click事件触发时依次运行
 let hooks = []
 
@@ -14,11 +19,11 @@ export function init(params) {
     let spmTextArray = [] // 存储每个元素的spm值
     getSpmText(event.target, event.currentTarget, spmTextArray)
     // 生成spm字符串
-    const spmText = spmTextArray.reverse().join('.')
+    const spm = spmTextArray.reverse().join('.')
 
     // 依次运行hook，并将spm字符串传入
     hooks.forEach(hook => {
-      hook(spmText)
+      hook(event, spm)
     })
   })
 }
@@ -141,4 +146,15 @@ function findSpmText(target) {
   }
 
   return ''
+}
+
+export async function record(data: IRecord) {
+  await fetch('http://localhost:9000/log', {
+    mode: 'no-cors',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data)
+  })
 }
