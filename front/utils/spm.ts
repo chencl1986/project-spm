@@ -3,44 +3,169 @@ export interface IRecord {
   spm: string
 }
 
+export interface IIntersectionObserverOption extends IntersectionObserverInit {
+  target?: HTMLElement
+  duration?: number
+}
+
+export interface IClickHook {
+  (event: Event, spm: string): void
+}
+
+export interface IIntersectionHook {
+  (
+    target: HTMLElement,
+    observerTarget: HTMLElement | Document,
+    spm: string
+  ): void
+}
+
+export interface IOption {
+  element?: HTMLElement
+  clickHooks?: IClickHook[]
+  intersectionHooks?: Array<IIntersectionHook>
+  intersectionOption?: IIntersectionObserverOption
+}
+
 // 缓存所有hook，并在click事件触发时依次运行
-let hooks = []
+let clickHooks: IClickHook[] = []
+let intersectionHooks = []
 
 // 为document.body绑定事件，获取spm值
-export function init(params) {
+export function init(options: IOption) {
   // 支持自定义监听点击的元素
-  const element = params.element ?? document.body
+  const element = options.element ?? document.body
   // 初始化传入的hook
-  const hookArray = params.hooks ?? []
+  const clickHookArray = options.clickHooks ?? []
+  const intersectionHookArray = options.intersectionHooks ?? []
   // 初始化时存储所有hook
-  hooks.push(...hookArray)
+  clickHooks.push(...clickHookArray)
+  intersectionHooks.push(...intersectionHookArray)
 
   element.addEventListener('click', function (event) {
-    let spmTextArray = [] // 存储每个元素的spm值
-    getSpmText(event.target, event.currentTarget, spmTextArray)
     // 生成spm字符串
-    const spm = spmTextArray.reverse().join('.')
+    const spm = getSpm(
+      event.target as HTMLElement,
+      event.currentTarget as HTMLElement
+    )
 
     // 依次运行hook，并将spm字符串传入
-    hooks.forEach(hook => {
-      hook(event, spm)
-    })
+    if (spm) {
+      clickHooks.forEach(hook => {
+        hook(event, spm)
+      })
+    }
   })
+
+  const elements = document.querySelectorAll('[data-spm-visible]')
+  // intersection(elements[1] as HTMLElement, options.intersectionOption)
+
+  for (const element of elements) {
+    intersection(element as HTMLElement, options.intersectionOption)
+  }
+
+  // Options for the observer (which mutations to observe)
+  const config = { childList: true, subtree: true }
+
+  // Callback function to execute when mutations are observed
+  const callback = mutationList => {
+    for (const mutation of mutationList) {
+      if (mutation.addedNodes?.length) {
+        mutation.addedNodes.forEach((element: Element): void => {
+          intersection(element as HTMLElement, options.intersectionOption)
+        })
+      }
+    }
+  }
+
+  // Create an observer instance linked to the callback function
+  const observer = new MutationObserver(callback)
+
+  // Start observing the target node for configured mutations
+  observer.observe(options.intersectionOption?.target ?? document, config)
+}
+
+function intersection(
+  element: HTMLElement,
+  intersectionOption: IIntersectionObserverOption = {}
+): void {
+  const { duration, ...intersectionInit } = intersectionOption
+  let options = {
+    root: document,
+    threshold: 0.3,
+    ...intersectionInit
+  }
+  const observerTarget = intersectionOption.target ?? document
+  let timer = 0
+
+  let observer = new IntersectionObserver(
+    (entries: IntersectionObserverEntry[]): void => {
+      const entry = entries?.[0]
+
+      if (entry?.isIntersecting) {
+        timer = window.setTimeout(() => {
+          const spm = getSpm(
+            entry.target as HTMLElement,
+            observerTarget as HTMLElement
+          )
+
+          if (spm) {
+            intersectionHooks.forEach((hook: IIntersectionHook): void => {
+              hook(entry.target as HTMLElement, observerTarget, spm)
+            })
+          }
+        }, duration ?? 3000)
+      } else {
+        clearTimeout(timer)
+      }
+    },
+    options
+  )
+
+  observer.observe(element)
 }
 
 // 添加hook
-export function addHook(hook) {
-  hooks.push(hook)
+export function addClickHook(hook: IClickHook) {
+  clickHooks.push(hook)
 }
 
 // 移除hook
-export function removeHook(removeHookItem) {
-  const removeIndex = hooks.findIndex(hook => hook === removeHookItem)
-  hooks.splice(removeIndex, 1)
+export function removeClickHook(removeHookItem: IClickHook) {
+  const removeIndex = clickHooks.findIndex(hook => hook === removeHookItem)
+  clickHooks.splice(removeIndex, 1)
+}
+
+// 添加hook
+export function addIntersectionHook(hook: IIntersectionHook) {
+  intersectionHooks.push(hook)
+}
+
+// 移除hook
+export function removeIntersectionHook(
+  intersectionHookItem: IIntersectionHook
+) {
+  const removeIndex = intersectionHooks.findIndex(
+    hook => hook === intersectionHookItem
+  )
+  intersectionHooks.splice(removeIndex, 1)
+}
+
+function getSpm(target: HTMLElement, currentTarget: HTMLElement): string {
+  let spmTextArray: string[] = [] // 存储每个元素的spm值
+  getSpmText(target, currentTarget, spmTextArray)
+  // 生成spm字符串
+  const spm = spmTextArray.reverse().join('.')
+
+  return spm
 }
 
 // 不断向父级元素查找，直到查找到绑定事件的元素
-function getSpmText(target, currentTarget, arr) {
+function getSpmText(
+  target: HTMLElement,
+  currentTarget: HTMLElement,
+  arr: string[]
+) {
   // 早点当前元素的spm
   const targetSpmText = findSpmText(target)
 
@@ -133,13 +258,13 @@ console.timeEnd('string')
 */
   }
 
-  getSpmText(target.parentNode, currentTarget, arr)
+  getSpmText(target.parentNode as HTMLElement, currentTarget, arr)
 }
 // 查找当前元素是否有data-spmx属性，并且其有值
 // 将data-spmx属性的值返回，无值返回''
-function findSpmText(target) {
-  const dataset = target.dataset
-  const spmKey = Object.keys(dataset).find(key => key.startsWith('spm'))
+function findSpmText(target: HTMLElement) {
+  const dataset = target.dataset ?? []
+  const spmKey = Object.keys(dataset).find(key => /spm[a-z]/.test(key))
 
   if (spmKey && dataset[spmKey]) {
     return dataset[spmKey]
@@ -148,13 +273,13 @@ function findSpmText(target) {
   return ''
 }
 
-export async function record(data: IRecord) {
+export async function record(data: IRecord | IRecord[]) {
   await fetch('http://localhost:9000/log', {
     mode: 'no-cors',
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(data)
+    body: JSON.stringify({ data })
   })
 }
