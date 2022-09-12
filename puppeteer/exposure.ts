@@ -31,7 +31,7 @@ import puppeteer from 'puppeteer'
     await wait(1500)
 
     for (let i = 0; i < count; i++) {
-      const elements = window.document.querySelectorAll('[data-spm-visible]')
+      const elements = window.document.querySelectorAll('[data-spm-exposure]')
       const index = Math.floor(Math.random() * elements.length)
       elements[index].scrollIntoView()
 

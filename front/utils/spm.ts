@@ -57,7 +57,7 @@ export function init(options: IOption) {
     }
   })
 
-  const elements = document.querySelectorAll('[data-spm-visible]')
+  const elements = document.querySelectorAll('[data-spm-exposure]')
   // intersection(elements[1] as HTMLElement, options.intersectionOption)
 
   for (const element of elements) {

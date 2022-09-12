@@ -36,7 +36,7 @@
           :key="'d' + id"
           :data-spmd="'d' + id"
           style="height: 50px; background-color: pink; margin-bottom: 10px"
-          data-spm-visible
+          data-spm-exposure
         >
           滚动 {{ ia }} {{ ib }} {{ ic }} {{ id }}
         </div>
@@ -55,14 +55,14 @@
       clickHooks: [
         async (event, spm: string) => {
           // @ts-ignore
-          if (event.target.tagName.toLowerCase() === 'a') {
+          if (event.target.hasAttribute('data-spm-pv')) {
             // @ts-ignore
             event.target.setAttribute('href', `/detail?spm=${spm}`)
           }
         },
         async (event, spm: string) => {
           // @ts-ignore
-          if (event.target.tagName.toLowerCase() === 'span') {
+          if (event.target.hasAttribute('data-spm-click')) {
             record({
               spm,
               type: 'click'
